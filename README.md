@@ -4,6 +4,8 @@
 
 目标是还原中心化交易所（CEX）永续合约后端的核心业务逻辑，适合用于学习，作为更完整系统的起点。
 
+> 博客文章: https://www.ciphermagic.cn/perp-engine-demo.html
+
 ---
 
 ## 模块概览
