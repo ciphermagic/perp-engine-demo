@@ -158,7 +158,7 @@ public class PositionService {
     // ── 内部 ─────────────────────────────────────────────
 
     private BigDecimal settle(Position pos, BigDecimal markPrice, boolean isLiquidation) {
-        BigDecimal pnl = pos.unrealizedPnl(markPrice);
+        BigDecimal pnl = pos.unrealizedPnl(markPrice).subtract(pos.getAccumulatedFunding());
         Account account = getAccount(pos.getAccountId());
         account.releaseMargin(pos.getMargin(), pnl);
 

@@ -85,6 +85,8 @@ public class Position {
         this.accumulatedFunding = this.accumulatedFunding.add(amount);
     }
 
+    public BigDecimal getAccumulatedFunding() { return accumulatedFunding; }
+
     public void close() {
         this.status = Status.CLOSED;
         this.closedAt = Instant.now();
