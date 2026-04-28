@@ -154,6 +154,19 @@ riskEngine.onPriceUpdate("BTC-USDT", markPrice);
 
 ---
 
+## 演进：Disruptor 高性能改造
+
+当前 Demo 使用 `ReentrantLock` 保证线程安全，生产环境可升级为 LMAX Disruptor 无锁单线程模型。
+
+改造要点：
+- 撮合线程从多线程竞争锁 → **单线程 per symbol，无锁**
+- Trade 消费从同步回调 → **异步 RingBuffer，不阻塞撮合**
+- 延迟从 ~50-200μs → **P99 < 1μs**，吞吐从 ~10 万 → **~600 万 orders/s**
+
+完整方案见 [DISRUPTOR_REFACTOR.md](DISRUPTOR_REFACTOR.md)，包含架构设计、完整代码、改造步骤和验证清单。
+
+---
+
 ## 与生产环境的差距
 
 本 Demo 是为了清晰展示核心逻辑而刻意简化的，生产系统还需要：
@@ -163,7 +176,7 @@ riskEngine.onPriceUpdate("BTC-USDT", markPrice);
 | 并发安全 | 数据库行锁 + 乐观锁版本号 | AtomicReference / ReentrantLock |
 | 持久化 | MySQL/TiDB + Redis | ConcurrentHashMap 内存 |
 | 消息推送 | Kafka / Disruptor | TradeListener 回调 |
-| 撮合性能 | 单线程 per-symbol + Disruptor | ReentrantLock |
+| 撮合性能 | 单线程 per-symbol + [Disruptor](DISRUPTOR_REFACTOR.md) | ReentrantLock |
 | 阶梯保证金 | Notional Tier 分级 mmr | 固定 0.5% |
 | 保险基金 | 亏损超保证金时动用 | 忽略 |
 | ADL 自动减仓 | 按盈利率排序减对手仓 | 未实现 |
