@@ -1,5 +1,7 @@
 package com.perp;
 
+import com.perp.engine.FundingEngine;
+import com.perp.engine.FundingScheduler;
 import com.perp.engine.MarginEngine;
 import com.perp.engine.RiskEngine;
 import com.perp.matching.MatchingEngine;
@@ -19,9 +21,20 @@ public class PerpEngineDemo {
                 new BigDecimal("0.0002"));
         PositionService posService = new PositionService(marginEngine);
         RiskEngine riskEngine = new RiskEngine(marginEngine, posService);
+        FundingEngine fundingEngine = new FundingEngine(marginEngine, posService);
         MatchingEngine matchEngine = new MatchingEngine();
 
         matchEngine.registerSymbol("BTC-USDT", new BigDecimal("94000"));
+
+        // ── Funding rate scheduler (8h UTC cycle) ───────
+        var book = matchEngine.getBook("BTC-USDT");
+        FundingScheduler fundingScheduler = new FundingScheduler(
+                fundingEngine,
+                "BTC-USDT",
+                () -> book.midPrice().orElse(new BigDecimal("94000")),
+                () -> new BigDecimal("94000"),   // simplified: fixed index price
+                () -> matchEngine.lastTradePrice("BTC-USDT"));
+        fundingScheduler.start();
 
         matchEngine.setTradeListener(trade -> {
             try {
@@ -128,8 +141,26 @@ public class PerpEngineDemo {
         System.out.printf("  Liquidations triggered: %d  position status: %s%n",
                 liquidated.size(), highLevPos.getStatus());
 
-        // ── Part 6: Final state ──────────────────────────
-        banner("Part 6: Final Order Book State");
+        // ── Part 6: Funding rate settlement ─────────────
+        banner("Part 6: Funding Rate Settlement (manual trigger for demo)");
+
+        posService.createAccount("trader2", new BigDecimal("50000"));
+        var longReq = new com.perp.model.OrderRequest(
+                "trader2", "BTC-USDT", Position.Side.LONG,
+                10, new BigDecimal("1.0"), null);
+        Position longPos = posService.openPosition(longReq, new BigDecimal("94000"));
+        System.out.printf("%n  Trader2 opens 10x LONG 1.0 BTC @ 94000%n");
+
+        System.out.println("  Triggering funding settlement (rate > 0 → longs pay shorts)...\n");
+        fundingScheduler.settleNow();
+
+        System.out.printf("  Trader2 accumulated funding charge: %s USDT%n",
+                longPos.getAccumulatedFunding());
+
+        fundingScheduler.shutdown();
+
+        // ── Part 7: Final state ──────────────────────────
+        banner("Part 7: Final Order Book State");
         printDepth(matchEngine, "BTC-USDT", 5);
         System.out.printf("%n  Last trade price : %s USDT%n", matchEngine.lastTradePrice("BTC-USDT"));
         System.out.printf("  Mid price        : %s USDT%n",
